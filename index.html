@@ -29,23 +29,36 @@
       cursor: pointer;
     }
 
+    /* CONTENEDOR CON SCROLL */
+    #preview {
+      max-height: 600px;
+      overflow: auto;
+      border: 1px solid #ccc;
+      margin-top: 15px;
+    }
+
     table {
       border-collapse: collapse;
       width: 100%;
-      margin-top: 15px;
       background: #fff;
+      white-space: nowrap;
+      /* Evita que el texto salte de línea y rompa la tabla */
     }
 
     th,
     td {
       border: 1px solid #ccc;
-      padding: 6px;
+      padding: 8px;
       font-size: 12px;
+      text-align: left;
     }
 
     th {
       background: #222;
       color: #fff;
+      position: sticky;
+      top: 0;
+      /* Encabezado fijo */
     }
   </style>
 </head>
