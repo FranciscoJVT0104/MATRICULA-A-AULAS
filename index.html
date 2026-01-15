@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>MATRICULAR A AULAS</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    input,
+    button {
+      padding: 10px;
+      margin: 5px 0;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 15px;
+      background: #fff;
+    }
+
+    th,
+    td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    th {
+      background: #222;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>MATRICULA A AULAS</h1>
+
+  <input type="file" id="excelFile" accept=".xlsx,.xls">
+  <br>
+  <button onclick="processExcel()">Procesar Excel</button>
+  <button onclick="exportCSV()">Exportar CSV UTF-8</button>
+  <button onclick="exportExcel()"><i class="fa-solid fa-file-excel fa-xs" style="color: #00ff00;"></i> Descargar Excel
+    (.xlsx)</button>
+
+
+  <div id="preview"></div>
+
+  <script>
+    /* =========================
+       NORMALIZADORES
+    ========================= */
+    function normalizeText(text) {
+      return text?.toString()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+    }
+
+    function getTurnoAbrev(turno) {
+      const t = normalizeText(turno);
+      if (t === "MANANA") return "M";
+      if (t === "TARDE") return "T";
+      if (t === "NOCHE") return "N";
+      return "";
+    }
+
+    function getCarreraAbrev(carrera) {
+      return normalizeText(carrera).substring(0, 3);
+    }
+
+    /* =========================
+       LOCALES
+    ========================= */
+    const LOCAL_CORRECCION_MAP = {
+      "AREQUIPA 9": "AREQUIPA 09",
+      "AREQ 9": "AREQUIPA 09",
+      "AREQUIPA 09": "AREQUIPA 09",
+      "AREQ 09": "AREQUIPA 09",
+      "AREQUIPA 14": "AREQUIPA 14",
+      "AREQ 14": "AREQUIPA 14",
+      "AR14": "AREQUIPA 14",
+      "AV. AREQUIPA 14": "AREQUIPA 14",
+      "AV AREQUIPA CDRA 14": "AREQUIPA 14",
+      "AV AREQUIPA CDRA 14": "AREQUIPA 14",
+      "ATE 01": "ATE 01",
+      "AYLLON 8": "ATE 01",
+      "AYLLON": "ATE 01",
+      "ATE1": "ATE 01",
+      "ATE - AYLLON 8": "ATE 01",
+      "ATE01": "ATE 01",
+      "ATE1": "ATE 01",
+      "ATE": "ATE 01",
+      "ATE": "ATE 01",
+      "ATE VITARTE AYLLON 831": "ATE 01",
+      "ATE - AYLLON": "ATE 01",
+      "ATE AYLLON": "ATE 01",
+      "BELISARIO": "BELISARIO",
+      "BEL": "BELISARIO",
+      "BELISARIO SUAREZ": "BELISARIO",
+      "BELISARIO SUAREZ": "BELISARIO",
+      "BELISARIO SUAREZ": "BELISARIO",
+      "BILLINGURTS": "BILLINGURTS",
+      "BILLINGHURTS": "BILLINGURTS",
+      "BILL": "BILLINGURTS",
+      "BILLINGHURTS": "BILLINGURTS",
+      "BILLINGHURST": "BILLINGURTS",
+      "CENTRAL": "CENTRAL",
+      "ROSITA": "CENTRAL",
+      "CEN": "CENTRAL",
+      "ROSITA-CENTRAL": "CENTRAL",
+      "PSJE ROSITA - CENTRAL": "CENTRAL",
+      "PASAJE NUEVA ROSITA 140": "CENTRAL",
+      "PASAJE NUEVA ROSITA 140": "CENTRAL",
+      "ROSITA": "CENTRAL",
+      "CHOTA": "CHOTA",
+      "CHO": "CHOTA",
+      "CLÍNICA": "CLÍNICA",
+      "CLINICA": "CLÍNICA",
+      "CLI": "CLÍNICA",
+      "AV ALFONSO UGARTE CDRA 10": "CLÍNICA",
+      "AV ALFONSO UGARTE CDRA 10": "CLÍNICA",
+      "ELEKTRA": "ELEKTRA",
+      "ELEKTRA-SOTANO": "ELEKTRA",
+      "ELE": "ELEKTRA",
+      "SOTANO-ELEKTRA": "ELEKTRA",
+      "PUENTE PIEDRA 712": "ELEKTRA",
+      "PUENTE PIEDRA 712": "ELEKTRA",
+      "ELEKTRA-ZOTANO": "ELEKTRA",
+      "HORACIO 1": "HORACIO 1",
+      "HORACIO": "HORACIO 1",
+      "HO1": "HORACIO 1",
+      "HORACIO ZEVALLOS": "HORACIO 1",
+      "HORACIO ZEBALLOS 1": "HORACIO 1",
+      "HORACIO ZEVALLOS": "HORACIO 1",
+      "HORACIO ZEVALLOS 1": "HORACIO 1",
+      "HORACIO 2": "HORACIO 2",
+      "HO2": "HORACIO 2",
+      "HORACIO LAS PRADERAS DE PARIACHI": "HORACIO 2",
+      "HORACIO LAS PRADERAS DE PARIACHI": "HORACIO 2",
+      "HORACIO ZEVALLOS 2": "HORACIO 2",
+      "LOS CHINOS": "LOS CHINOS",
+      "CHINOS": "LOS CHINOS",
+      "CHI": "LOS CHINOS",
+      "SJM SAN JUAN 721": "LOS CHINOS",
+      "SJM SAN JUAN 721": "LOS CHINOS",
+      "M.IGLESIAS": "M.IGLESIAS",
+      "MIG": "M.IGLESIAS",
+      "SJM MIGUEL IGLESIAS SAN ANTONIO DE PADUA II ETAPA": "M.IGLESIAS",
+      "MENDIOLA": "MENDIOLA",
+      "MEN": "MENDIOLA",
+      "ALFREDO MENDIOLA 3349": "MENDIOLA",
+      "PTE PIEDRA 2": "PTE PIEDRA 2",
+      "PTE. PIEDRA 2": "PTE PIEDRA 2",
+      "PUENTE PIEDRA 2": "PTE PIEDRA 2",
+      "PP2": "PTE PIEDRA 2",
+      "PTE. PIEDRA 2": "PTE PIEDRA 2",
+      "PUENTE PIEDRA 191": "PTE PIEDRA 2",
+      "SALAVERRY": "SALAVERRY",
+      "SAL": "SALAVERRY",
+      "SAN LAZARO": "SAN LAZARO",
+      "SAN LÁZARO": "SAN LAZARO",
+      "SLZ": "SAN LAZARO",
+      "SAN LAZARO 216": "SAN LAZARO",
+      "SAN LAZARO 216": "SAN LAZARO",
+      "SJL 10": "SJL 10",
+      "SJL -10": "SJL 10",
+      "SJL10": "SJL 10",
+      "SJL 12": "SJL 12",
+      "SJL12": "SJL 12",
+      "SJL 12 SANTA ROSA": "SJL 12",
+      "SJL -12": "SJL 12",
+      "SJL-12": "SJL 12",
+      "SJL 12": "SJL 12",
+      "SJL 22": "SJL 22",
+      "SJL -22": "SJL 22",
+      "SJL22": "SJL 22",
+      "SAN JUAN DE LURIGANCHO SAN HILARION": "SJL 22",
+      "SJL 50": "SJL 50",
+      "SJL -50": "SJL 50",
+      "SJL - 50": "SJL 50",
+      "SJL50": "SJL 50",
+      "SAN JUAN DE LURIGANCHO 5010": "SJL 50",
+      "SAN JUAN DE LURIGANCHO URB LOS JARDINES DE SAN JUAN": "SJL10",
+      "VILLA EL SALVADOR": "VILLA EL SALVADOR",
+      "VES 1": "VILLA EL SALVADOR",
+      "VILLA EL SALVADOR 1": "VILLA EL SALVADOR",
+      "VES": "VILLA EL SALVADOR",
+      "VILLA SALVADOR 1": "VILLA EL SALVADOR",
+      "VILLA SALVADOR": "VILLA EL SALVADOR",
+      "VILLA EL SALVADOR PARQUE INDUSTRIAL": "VILLA EL SALVADOR",
+      "VILLA EL SALVADOR PARQUE INDUSTRIAL": "VILLA EL SALVADOR",
+      "VILLA EL SALVADOR 2": "VILLA EL SALVADOR 2",
+      "VES 2": "VILLA EL SALVADOR 2",
+      "VES 2": "VILLA EL SALVADOR 2",
+      "VES2": "VILLA EL SALVADOR 2",
+      "VILLA SALVADOR 2": "VILLA EL SALVADOR 2",
+      "VILLA EL SALVADOR 2": "VILLA EL SALVADOR 2",
+      "VILLA MARIA DEL TRIUNFO": "VILLA MARIA DEL TRIUNFO",
+      "VMT": "VILLA MARIA DEL TRIUNFO",
+      "VILLANERÍA DE TRIUNFO": "VILLA MARIA DEL TRIUNFO",
+      "VILLANERIA DE TRIUNFO": "VILLA MARIA DEL TRIUNFO",
+      "VILLA MARIA DEL TRIUNFO": "VILLA MARIA DEL TRIUNFO",
+      "VILLAMARÍA DEL TRIUNFO": "VILLA MARIA DEL TRIUNFO",
+      "VISTA ALEGRE": "VISTA ALEGRE",
+      "V. ALEGRE": "VISTA ALEGRE",
+      "VAL": "VISTA ALEGRE",
+      "AYLLON VISTA ALEGRE": "VISTA ALEGRE"
+    };
+
+    const LOCAL_ABREV_MAP = {
+      "AREQUIPA 9": "AR09",
+      "AREQ 9": "AR09",
+      "AREQUIPA 09": "AR09",
+      "AREQ 09": "AR09",
+      "AREQUIPA 14": "AR14",
+      "AREQ 14": "AR14",
+      "AR14": "AR14",
+      "AV. AREQUIPA 14": "AR14",
+      "AV AREQUIPA CDRA 14": "AR14",
+      "AV AREQUIPA CDRA 14": "AR14",
+      "ATE 01": "ATE1",
+      "AYLLON 8": "ATE1",
+      "AYLLON": "ATE1",
+      "ATE1": "ATE1",
+      "ATE - AYLLON 8": "ATE1",
+      "ATE01": "ATE1",
+      "ATE1": "ATE1",
+      "ATE": "ATE1",
+      "ATE": "ATE1",
+      "ATE VITARTE AYLLON 831": "ATE1",
+      "ATE - AYLLON": "ATE1",
+      "ATE AYLLON": "ATE1",
+      "BELISARIO": "BEL",
+      "BEL": "BEL",
+      "BELISARIO SUAREZ": "BEL",
+      "BELISARIO SUAREZ": "BEL",
+      "BELISARIO SUAREZ": "BEL",
+      "BILLINGURTS": "BILL",
+      "BILLINGHURTS": "BILL",
+      "BILL": "BILL",
+      "BILLINGHURTS": "BILL",
+      "BILLINGHURST": "BILL",
+      "CENTRAL": "CEN",
+      "ROSITA": "CEN",
+      "CEN": "CEN",
+      "ROSITA-CENTRAL": "CEN",
+      "PSJE ROSITA - CENTRAL": "CEN",
+      "PASAJE NUEVA ROSITA 140": "CEN",
+      "PASAJE NUEVA ROSITA 140": "CEN",
+      "ROSITA": "CEN",
+      "CHOTA": "CHO",
+      "CHO": "CHO",
+      "CLÍNICA": "CLI",
+      "CLINICA": "CLI",
+      "CLI": "CLI",
+      "AV ALFONSO UGARTE CDRA 10": "CLI",
+      "AV ALFONSO UGARTE CDRA 10": "CLI",
+      "ELEKTRA": "ELE",
+      "ELEKTRA-SOTANO": "ELE",
+      "ELE": "ELE",
+      "SOTANO-ELEKTRA": "ELE",
+      "PUENTE PIEDRA 712": "ELE",
+      "PUENTE PIEDRA 712": "ELE",
+      "ELEKTRA-ZOTANO": "ELE",
+      "HORACIO 1": "HO1",
+      "HORACIO": "HO1",
+      "HO1": "HO1",
+      "HORACIO ZEVALLOS": "HO1",
+      "HORACIO ZEBALLOS 1": "HO1",
+      "HORACIO ZEVALLOS": "HO1",
+      "HORACIO ZEVALLOS 1": "HO1",
+      "HORACIO 2": "HO2",
+      "HO2": "HO2",
+      "HORACIO LAS PRADERAS DE PARIACHI": "HO2",
+      "HORACIO LAS PRADERAS DE PARIACHI": "HO2",
+      "HORACIO ZEVALLOS 2": "HO2",
+      "LOS CHINOS": "CHI",
+      "CHINOS": "CHI",
+      "CHI": "CHI",
+      "SJM SAN JUAN 721": "CHI",
+      "SJM SAN JUAN 721": "CHI",
+      "M.IGLESIAS": "MIG",
+      "MIG": "MIG",
+      "SJM MIGUEL IGLESIAS SAN ANTONIO DE PADUA II ETAPA": "MIG",
+      "MENDIOLA": "MEN",
+      "MEN": "MEN",
+      "ALFREDO MENDIOLA 3349": "MEN",
+      "PTE PIEDRA 2": "PP2",
+      "PTE. PIEDRA 2": "PP2",
+      "PUENTE PIEDRA 2": "PP2",
+      "PP2": "PP2",
+      "PTE. PIEDRA 2": "PP2",
+      "PUENTE PIEDRA 191": "PP2",
+      "SALAVERRY": "SAL",
+      "SAL": "SAL",
+      "SAN LAZARO": "SLZ",
+      "SAN LÁZARO": "SLZ",
+      "SLZ": "SLZ",
+      "SAN LAZARO 216": "SLZ",
+      "SAN LAZARO 216": "SLZ",
+      "SJL 10": "SJL10",
+      "SJL -10": "SJL10",
+      "SJL10": "SJL10",
+      "SJL 12": "SJL12",
+      "SJL12": "SJL12",
+      "SJL 12 SANTA ROSA": "SJL12",
+      "SJL -12": "SJL12",
+      "SJL-12": "SJL12",
+      "SJL 12": "SJL12",
+      "SJL 22": "SJL22",
+      "SJL -22": "SJL22",
+      "SJL22": "SJL22",
+      "SAN JUAN DE LURIGANCHO SAN HILARION": "SJL22",
+      "SJL 50": "SJL50",
+      "SJL -50": "SJL50",
+      "SJL - 50": "SJL50",
+      "SJL50": "SJL50",
+      "SAN JUAN DE LURIGANCHO 5010": "SJL50",
+      "SAN JUAN DE LURIGANCHO URB LOS JARDINES DE SAN JUAN": "SJL10",
+      "VILLA EL SALVADOR": "VES",
+      "VES 1": "VES",
+      "VILLA EL SALVADOR 1": "VES",
+      "VES": "VES",
+      "VILLA SALVADOR 1": "VES",
+      "VILLA SALVADOR": "VES",
+      "VILLA EL SALVADOR PARQUE INDUSTRIAL": "VES",
+      "VILLA EL SALVADOR PARQUE INDUSTRIAL": "VES",
+      "VILLA EL SALVADOR 2": "VES2",
+      "VES 2": "VES2",
+      "VES 2": "VES2",
+      "VES2": "VES2",
+      "VILLA SALVADOR 2": "VES2",
+      "VILLA EL SALVADOR 2": "VES2",
+      "VILLA MARIA DEL TRIUNFO": "VMT",
+      "VMT": "VMT",
+      "VILLANERÍA DE TRIUNFO": "VMT",
+      "VILLANERIA DE TRIUNFO": "VMT",
+      "VILLA MARIA DEL TRIUNFO": "VMT",
+      "VILLAMARÍA DEL TRIUNFO": "VMT",
+      "VISTA ALEGRE": "VAL",
+      "V. ALEGRE": "VAL",
+      "VAL": "VAL",
+      "AYLLON VISTA ALEGRE": "VAL"
+    };
+
+    function getLocalAbrev(local) {
+      const norm = normalizeText(local);
+      const corr = LOCAL_CORRECCION_MAP[norm] || norm;
+      return LOCAL_ABREV_MAP[corr] || "SINLOC";
+    }
+
+    function getModalidad(local) {
+      const norm = normalizeText(local);
+      const corr = LOCAL_CORRECCION_MAP[norm] || norm;
+      return `PRESENCIAL-${corr}`;
+    }
+
+    /* =========================
+       CURSOS
+    ========================= */
+    const COURSE_ABREV_MAP = {
+      "(1H)/MATEMATICA APLICADA": "(1H)",
+      "ACTIVIDADES EN SALUD PUBLICA": "ACTI",
+      "ACTIVIDADES FARMACEUTICAS EN SALUD COMUNITARIA": "ACTI",
+      "AGENTES FISICOS I": "AGEN",
+      "ALMACENAMIENTO, DISTRIBUCION Y TRANSPORTE DE PRODUCTOS FARMACEUTICOS": "ALMA",
+      "ALTERACIONES DEL DESARROLLO PSICOMOTOR": "ALTE",
+      "APARATOLOGIA DE ORTODONCIA FIJA": "APAR",
+      "ASISTENCIA AL ADULTO MAYOR": "ASIS",
+      "ASISTENCIA AL USUARIO CON PATOLOGIAS": "ASIS",
+      "ASISTENCIA AL USUARIO ONCOLOGICO": "ASIS",
+      "ASISTENCIA AL USUARIO QUIRURGICO": "ASIS",
+      "ASISTENCIA BASICA HOSPITALARIA": "ASIS",
+      "ASISTENCIA DE ENFERMERIA EN SALUD MENTAL": "ASIS",
+      "ASISTENCIA EN FISIOTERAPIA Y REHABILITACION": "ASIS",
+      "ASISTENCIA EN MEDICINA ALTERNATIVA Y COMPLEMENTARIA": "ASIS",
+      "ASISTENCIA EN MEDICINA TRADICIONAL Y ALTERNATIVA": "ASIS",
+      "ASISTENCIA EN SALUD BUCAL": "ASIS",
+      "ATENCION BASICA DE URGENCIAS Y EMERGENCIAS": "ATEN",
+      "ATENCION EN SALUD MATERNA Y NEONATAL": "ATEN",
+      "BASES CONCEPTUALES": "BASE",
+      "BASES CONCEPTUALES DE LAS ENFERMEDADES": "BASE",
+      "BASES FARMACOLOGICAS DE LOS MEDICAMENTOS": "BASE",
+      "BIOMECANICA": "BIOM",
+      "BUENAS PRACTICAS DE ELABORACION,ROTULADO Y ENVASADO DE FORMULAS MAGISTRALES Y PREPARADOS OFICINALES": "BUEN",
+      "CITOTECNOLOGIA EXFOLIATIVA": "CITO",
+      "COMUNICACION BASICA EN INGLES": "COMU",
+      "CRECIMIENTO Y DESARROLLO HUMANO": "CREC",
+      "DESARROLLO PSICOMOTOR": "DESA",
+      "EDUCACION Y COMUNICACION EN SALUD": "EDUC",
+      "EJERCICIOS TERAPEUTICOS": "EJER",
+      "ELABORACION DE FORMAS FARMACEUTICAS": "ELAB",
+      "EMPRENDIMIENTO": "EMPR",
+      "ESTUDIO ESTRUCTURAL Y FUNCIONAL DEL SER HUMANA I": "ESTU",
+      "ESTUDIO ESTRUCTURAL Y FUNCIONAL DEL SER HUMANO": "ESTU",
+      "ESTUDIO ESTRUCTURAL Y FUNCIONAL DEL SER HUMANO ": "ESTU",
+      "ETICA Y CIUDADANIA": "ETIC",
+      "FARMACOLOGIA APLICADA A ENFERMERIA": "FARM",
+      "FARMACOTECNIA I": "FARM",
+      "FARMACOTECNIA II": "FARM",
+      "FISIOTERAPIA DEPORTIVA": "FISI",
+      "FUNDAMENTOS BASICOS DE TOXICOLOGIA": "FUND",
+      "FUNDAMENTOS BIOLOGICOS Y QUIMICOS DEL SER HUMANO": "FUND",
+      "FUNDAMENTOS BIOLOGICOS Y QUIMICOS EN EL SER HUMANO": "FUND",
+      "FUNDAMENTOS DE EPIDEMIOLOGIA": "FUND",
+      "FUNDAMENTOS DE NEUROANATOMIA": "FUND",
+      "FUNDMENTOS BIOLOGICOS Y QUIMICOS DEL SER HUMANO": "FUND",
+      "GESTION DE EXISTENCIAS Y OPERACIONES BASICAS EN LABORATORIO": "GEST",
+      "GESTION DOCUMENTARIA EN ESTABLECIMIENTOS FARMACEUTICOS": "GEST",
+      "GETION Y AUTOMATIZACION EN LABORATORIO CLINICO": "GETI",
+      "HERRAMIENTAS INFORMATICAS": "HERR",
+      "HIGIENE Y SANEAMIENTO EN LOS ESTABLECIMIENTOS FARMACEUTICOS": "HIGI",
+      "INMUNOLOGIA GENERAL": "INMU",
+      "INNOVACION": "INNO",
+      "INTERPRETACION DE PRUEBA DE LABORATORIO": "INTE",
+      "INTRODUCCION A LA FISIOTERAPIA Y REHABILITACION": "INTR",
+      "INTRODUCCION A LA SALUD COMUNITARIA": "INTR",
+      "INTRODUCCION A LA SALUD PUBLICA": "INTR",
+      "INTRODUCCION AL INGLES TECNICO": "INTR",
+      "MANEJO,CONTROL E INVENTARIO DE EQUIPOS,MATERIALES E INSUMOS FARMACEUTICOS": "MANE",
+      "MASOTERAPIA": "MASO",
+      "MASOTRAPIA": "MASO",
+      "MATEMATICA APLICADA": "MATE",
+      "MATERIALES DENTALES": "MATE",
+      "MEDIO AMBIENTE Y DESARROLLO SOSTENIBLE": "MEDI",
+      "METODOS DE EXTRACCION E IDENTIFICACION DE RECURSOS NATURALES": "METO",
+      "MICOLOGIA-VIROLOGIA CLINICA": "MICO",
+      "MORFOFISIOLOGIA HUMANA": "MORF",
+      "NEUROFISIOLOGIA II": "NEUR",
+      "NUTRICION Y DIETAS": "NUTR",
+      "PETITORIO NACIONAL DE MEDICAMENTOS ESENCIALES": "PETI",
+      "PRINCIPIOS BASICOS DE ADMINISTRACION Y LEGISLACION FARMACEUTICA": "PRIN",
+      "PRINCIPIOS BASICOS DE BIOSEGURIDAD": "PRIN",
+      "PROCEDIMIENTOS INVASIVOS Y NO INVASIVOS": "PROC",
+      "PROTESIS DENTAL PARCIAL REMOVIBLE BASE ACRILICA": "PROT",
+      "PROTESIS DENTAL PARCIAL REMOVIBLE DENTOSOPORTADA": "PROT",
+      "PROTESIS DENTAL TOTAL MONOPLANO": "PROT",
+      "PROTESIS INTEGRAL ESPECIALIZADA": "PROT",
+      "PRUEBAS DE VALORACION FUNCIONAL MUSCULAR": "PRUE",
+      "REHABILITACION INTEGRAL": "REHA",
+      "REPARACIONES DE PROTESIS PARCIAL REMOVIBLE": "REPA",
+      "RETENEDORES INTRARADICULARES E INTRACORONARIOS": "RETE",
+      "SALUD DEL NIÑO Y ADOLESCENTE": "SALU",
+      "SEMIOLOGIA BASICA": "SEMI",
+      "TECNICA DE CONTROL DE CALIDAD EN LA INDUSTRIA FARMACEUTICA": "TECN",
+      "TECNICAS DE ADMINISTRACION DE MEDICAMENTOS": "TECN",
+      "TECNICAS DE COMUNICACION": "TECN",
+      "TECNICAS DE TRANSFORMACION DE RECURSOS NATURALES": "TECN",
+      "TERAPIA DE LENGUAJE": "TERA",
+      "TERAPIA EN GERIATRIA": "TERA",
+      "TERAPIA EN PATOLOGIA NEUROLOGICA": "TERA",
+      "TERAPIA EN PATOLOGIA REUMATOLOGICA": "TERA",
+      "TERAPIA EN TRAUMATOLOGIA Y ORTOPEDIA": "TERA",
+      "TERAPIA OCUPACIONAL": "TERA",
+      "TERAPIA Y PATOLOGIA NEUROLOGICA": "TERA",
+      "VENTA Y DISPENSACION DE MEDICAMENTOS Y PRODUCTOS AFINES": "VENT"
+    };
+
+    function getCursoAbrev(curso) {
+      const key = normalizeText(curso);
+      if (!COURSE_ABREV_MAP[key]) {
+        console.warn("Curso no encontrado:", curso);
+        return "SINCURSO";
+      }
+      return COURSE_ABREV_MAP[key];
+    }
+
+    /* =========================
+       SHORTNAME
+    ========================= */
+    function normalizeAula(aula) {
+      if (!aula) return "";
+
+      return String(aula)
+        .toUpperCase()
+        .replace(/\s+/g, "")
+        .replace(/([A-Z])-([0-9]+)/, "$1$2");
+    }
+
+    function buildShortname({ aula, turno, local, carrera, ciclo, curso, seccion, hasMultipleCourses }) {
+      if (!curso) return "";
+
+      const aulaNormalizada = normalizeAula(aula);
+      const aulaFinal = `AULA${aulaNormalizada}${getTurnoAbrev(turno)}`;
+      const localAbrev = getLocalAbrev(local);
+      const carreraAbrev = getCarreraAbrev(carrera);
+      const cursoAbrev = getCursoAbrev(curso);
+
+      if (hasMultipleCourses) {
+        return `${aulaFinal}-${seccion}-${localAbrev}-ENE26-${carreraAbrev}-${ciclo}-${cursoAbrev}`;
+      }
+
+      return `${aulaFinal}-${localAbrev}-ENE26-${carreraAbrev}-${ciclo}-${cursoAbrev}`;
+    }
+
+    function normalizeDNI(dni) {
+      if (!dni) return "";
+      const value = String(dni).trim();
+      // 📱 Celular: 9 dígitos empezando en 9 → NO TOCAR
+      if (/^9\d{8}$/.test(value)) {
+        return value;
+      }
+      // 🆔 DNI de 7 dígitos → agregar 0 adelante
+      if (/^\d{7}$/.test(value)) {
+        return "0" + value;
+      }
+      // 🆔 DNI correcto de 8 dígitos → dejar igual
+      if (/^\d{8}$/.test(value)) {
+        return value;
+      }
+
+      return value;
+    }
+
+    function toUpper(text) {
+      return text ? text.toString().trim().toUpperCase() : "";
+    }
+
+    function normalizePhone(phone) {
+      if (!phone) return "";
+
+      // Quitar todo lo que no sea número
+      let digits = phone.toString().replace(/\D/g, "");
+
+      // Si empieza con 51 y tiene más de 9 dígitos → quitar prefijo
+      if (digits.startsWith("51") && digits.length > 9) {
+        digits = digits.slice(2);
+      }
+
+      // Quedarse con los últimos 9 dígitos
+      if (digits.length > 9) {
+        digits = digits.slice(-9);
+      }
+
+      // Validar que tenga 9 dígitos y empiece con 9
+      if (!/^9\d{8}$/.test(digits)) {
+        return "";
+      }
+
+      return digits;
+    }
+
+    /* =========================
+       TRANSFORMACIÓN
+    ========================= */
+    let transformedData = [];
+
+    function transformData(rows) {
+      return rows.map(r => {
+        const dniNormalizado = normalizeDNI(r.dni);
+        const multi = !!r.course2;
+
+        return {
+          username: dniNormalizado,
+          password: dniNormalizado,
+          lastname: toUpper(r.lastname),
+          firstname: toUpper(r.firstname),
+          profile_field_celular: normalizePhone(r.celular),
+          email: r.email,
+          course1: buildShortname({
+            aula: r.aula,
+            turno: r.turno,
+            local: r.local,
+            carrera: r.carrera,
+            ciclo: r.ciclo,
+            curso: r.course1,
+            seccion: multi ? "A" : null,
+            hasMultipleCourses: multi
+          }),
+          course2: multi ? buildShortname({
+            aula: r.aula,
+            turno: r.turno,
+            local: r.local,
+            carrera: r.carrera,
+            ciclo: r.ciclo,
+            curso: r.course2,
+            seccion: "B",
+            hasMultipleCourses: multi
+          }) : "",
+          profile_field_carrera: r.carrera,
+          profile_field_ciclo: r.ciclo,
+          profile_field_cargo: "ESTUDIANTE ACT-ENERO",
+          profile_field_mes: "ENERO",
+          profile_field_modalidad: getModalidad(r.local),
+          profile_field_ingreso: "NUEVO_ENE26"
+        };
+      });
+    }
+
+    /* =========================
+       EXCEL → JSON
+    ========================= */
+    function processExcel() {
+      const file = document.getElementById("excelFile").files[0];
+      if (!file) return alert("Seleccione un archivo Excel");
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        const workbook = XLSX.read(e.target.result, { type: "binary" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        transformedData = transformData(json);
+        renderTable(transformedData);
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    /* =========================
+       PREVIEW
+    ========================= */
+    function renderTable(data) {
+      let html = "<table><tr>";
+      Object.keys(data[0]).forEach(k => html += `<th>${k}</th>`);
+      html += "</tr>";
+
+      data.forEach(r => {
+        html += "<tr>";
+        Object.values(r).forEach(v => html += `<td>${v}</td>`);
+        html += "</tr>";
+      });
+
+      html += "</table>";
+      document.getElementById("preview").innerHTML = html;
+    }
+
+    /* =========================
+    EXPORT CSV UTF-8 BOM (;)
+    ========================= */
+    function exportCSV() {
+      if (!transformedData.length) {
+        alert("No hay datos");
+        return;
+      }
+
+      const separator = ";";
+
+      const headers = Object.keys(transformedData[0]).join(separator);
+      const rows = transformedData.map(row =>
+        Object.values(row)
+          .map(value => `"${String(value).replace(/"/g, '""')}"`)
+          .join(separator)
+      );
+
+      const csvContent = [headers, ...rows].join("\r\n");
+
+      const blob = new Blob(
+        ["\uFEFF" + csvContent],
+        { type: "text/csv;charset=utf-8;" }
+      );
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "MATRICULA.csv";
+      link.click();
+    }
+
+    /* =========================
+    EXPORT EXCEL XLSX
+    ========================= */
+    function exportExcel() {
+      if (!transformedData.length) {
+        alert("No hay datos");
+        return;
+      }
+      const worksheet = XLSX.utils.json_to_sheet(transformedData);
+      const workbook = XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Usuarios");
+
+      XLSX.writeFile(workbook, "MATRICULA.xlsx");
+    }
+
+  </script>
+</body>
+
+</html>
