@@ -497,11 +497,18 @@
     };
 
     function getCursoAbrev(curso) {
-      const key = normalizeText(curso);
+      if (!curso) return "SINCURSO";
+
+      const key = curso
+        .toString()
+        .trim()
+        .toUpperCase(); // ⚠️ NO quitar tildes
+
       if (!COURSE_ABREV_MAP[key]) {
-        console.warn("Curso no encontrado:", curso);
+        console.warn("❌ Curso no encontrado:", key);
         return "SINCURSO";
       }
+
       return COURSE_ABREV_MAP[key];
     }
 
